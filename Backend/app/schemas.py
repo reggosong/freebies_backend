@@ -12,7 +12,7 @@ class UserRead(BaseModel):
     username: str
     email: EmailStr
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
@@ -32,4 +32,4 @@ class PostRead(BaseModel):
     owner_id: int
     created_at: datetime
     class Config:
-        orm_mode = True 
+        from_attributes = True 
