@@ -1,0 +1,133 @@
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from app import schemas, crud, utils
+from app.db import get_db
+from app.models.post import PostCategory
+from app.models.interaction import Comment, Like, GotIt
+import shutil
+import os
+from datetime import datetime
+
+router = APIRouter(prefix="/posts", tags=["posts"])
+
+# Create post with photo upload
+@router.post("/", response_model=schemas.PostRead)
+async def create_post(
+    title: str,
+    description: str,
+    category: PostCategory,
+    latitude: float,
+    longitude: float,
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    # Save photo
+    photo_path = f"uploads/posts/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.filename}"
+    os.makedirs(os.path.dirname(photo_path), exist_ok=True)
+    
+    with open(photo_path, "wb") as buffer:
+        shutil.copyfileobj(photo.file, buffer)
+    
+    post_data = schemas.PostCreate(
+        title=title,
+        description=description,
+        category=category,
+        latitude=latitude,
+        longitude=longitude,
+        photo_url=photo_path
+    )
+    
+    return crud.create_post(db, post_data, current_user.id)
+
+# Get post by ID
+@router.get("/{post_id}", response_model=schemas.PostRead)
+def get_post(post_id: int, db: Session = Depends(get_db)):
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    return post
+
+# Get feed with filters
+@router.get("/", response_model=List[schemas.PostRead])
+def get_feed(
+    skip: int = 0,
+    limit: int = 20,
+    category: Optional[PostCategory] = None,
+    latitude: Optional[float] = None,
+    longitude: Optional[float] = None,
+    radius: Optional[float] = None,  # in kilometers
+    following_only: bool = False,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    return crud.get_feed(
+        db,
+        current_user.id,
+        skip=skip,
+        limit=limit,
+        category=category,
+        latitude=latitude,
+        longitude=longitude,
+        radius=radius,
+        following_only=following_only
+    )
+
+# Update post
+@router.put("/{post_id}", response_model=schemas.PostRead)
+def update_post(
+    post_id: int,
+    post: schemas.PostUpdate,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    db_post = crud.get_post(db, post_id)
+    if not db_post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if db_post.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this post")
+    return crud.update_post(db, post_id, post)
+
+# Delete post
+@router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    db_post = crud.get_post(db, post_id)
+    if not db_post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if db_post.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this post")
+    crud.delete_post(db, post_id)
+    return None
+
+# Like/Unlike post
+@router.post("/{post_id}/like", response_model=schemas.LikeRead)
+def like_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    return crud.toggle_like(db, post_id, current_user.id)
+
+# Comment on post
+@router.post("/{post_id}/comment", response_model=schemas.CommentRead)
+def comment_post(
+    post_id: int,
+    comment: schemas.CommentCreate,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    return crud.create_comment(db, post_id, current_user.id, comment)
+
+# Mark post as "Got it"
+@router.post("/{post_id}/got-it", response_model=schemas.GotItRead)
+def got_it_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    return crud.toggle_got_it(db, post_id, current_user.id) 
