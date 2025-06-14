@@ -5,7 +5,7 @@ from sqlalchemy import pool
 
 from alembic import context
 
-from app.config import settings
+from app.config import get_settings
 from app.models import user, post, follow
 
 # this is the Alembic Config object, which provides
@@ -27,7 +27,7 @@ target_metadata = user.Base.metadata
 # ... etc.
 
 def get_url():
-    return settings.DATABASE_URL
+    return get_settings().DATABASE_URL
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

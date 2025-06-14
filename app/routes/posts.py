@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app import schemas, crud, utils
@@ -8,37 +8,52 @@ from app.models.interaction import Comment, Like, GotIt
 import shutil
 import os
 from datetime import datetime
+from pydantic import ValidationError
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
 # Create post with photo upload
 @router.post("/", response_model=schemas.PostRead)
 async def create_post(
-    title: str,
-    description: str,
-    category: PostCategory,
-    latitude: float,
-    longitude: float,
+    title: str = Form(...),
+    description: str = Form(...),
+    category: PostCategory = Form(...),
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    content: str = Form(None),
     photo: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: schemas.UserRead = Depends(utils.get_current_user)
 ):
+    logger.info(f"Creating post for user: {current_user.username}")
+    if not content:
+        logger.warning("Content field is missing")
+        raise HTTPException(status_code=400, detail="Please enter content for your post.")
     # Save photo
     photo_path = f"uploads/posts/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.filename}"
     os.makedirs(os.path.dirname(photo_path), exist_ok=True)
-    
     with open(photo_path, "wb") as buffer:
         shutil.copyfileobj(photo.file, buffer)
-    
-    post_data = schemas.PostCreate(
-        title=title,
-        description=description,
-        category=category,
-        latitude=latitude,
-        longitude=longitude,
-        photo_url=photo_path
-    )
-    
+    try:
+        post_data = schemas.PostCreate(
+            title=title,
+            description=description,
+            category=category,
+            latitude=latitude,
+            longitude=longitude,
+            photo_url=photo_path,
+            content=content
+        )
+    except ValidationError as e:
+        for err in e.errors():
+            if err['loc'][-1] == 'content' and err['type'] == 'missing':
+                raise HTTPException(status_code=400, detail="Please enter content for your post.")
+        raise HTTPException(status_code=400, detail=str(e))
     return crud.create_post(db, post_data, current_user.id)
 
 # Get post by ID

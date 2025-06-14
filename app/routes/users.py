@@ -6,6 +6,11 @@ from app.db import get_db
 import shutil
 import os
 from datetime import datetime
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -14,6 +19,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 def get_current_user_profile(
     current_user: schemas.UserRead = Depends(utils.get_current_user)
 ):
+    logger.info(f"User profile requested for user: {current_user.username}")
     return current_user
 
 # Update current user profile
@@ -64,7 +70,9 @@ def follow_user(
     db: Session = Depends(get_db),
     current_user: schemas.UserRead = Depends(utils.get_current_user)
 ):
+    logger.info(f"User {current_user.username} attempting to follow user ID: {user_id}")
     if user_id == current_user.id:
+        logger.warning(f"User {current_user.username} attempted to follow themselves")
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
     return crud.toggle_follow(db, current_user.id, user_id)
 

@@ -9,20 +9,20 @@ from app.models.message import MessageType
 
 # User operations
 def get_user(db: Session, user_id: int):
-    return db.query(models.User).filter(models.User.id == user_id).first()
+    return db.query(models.user.User).filter(models.user.User.id == user_id).first()
 
 def get_user_by_username(db: Session, username: str):
-    return db.query(models.User).filter(models.User.username == username).first()
+    return db.query(models.user.User).filter(models.user.User.username == username).first()
 
 def get_user_by_email(db: Session, email: str):
-    return db.query(models.User).filter(models.User.email == email).first()
+    return db.query(models.user.User).filter(models.user.User.email == email).first()
 
 def get_users(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.User).offset(skip).limit(limit).all()
+    return db.query(models.user.User).offset(skip).limit(limit).all()
 
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = utils.get_password_hash(user.password)
-    db_user = models.User(
+    db_user = models.user.User(
         username=user.username,
         email=user.email,
         hashed_password=hashed_password
@@ -42,13 +42,13 @@ def update_user(db: Session, user_id: int, update_data: dict):
 
 # Post operations
 def get_post(db: Session, post_id: int):
-    return db.query(models.Post).filter(models.Post.id == post_id).first()
+    return db.query(models.post.Post).filter(models.post.Post.id == post_id).first()
 
 def get_user_posts(db: Session, user_id: int, skip: int = 0, limit: int = 20):
-    return db.query(models.Post).filter(models.Post.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.post.Post).filter(models.post.Post.owner_id == user_id).offset(skip).limit(limit).all()
 
 def create_post(db: Session, post: schemas.PostCreate, user_id: int):
-    db_post = models.Post(**post.dict(), owner_id=user_id)
+    db_post = models.post.Post(**post.dict(), owner_id=user_id)
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
@@ -79,32 +79,32 @@ def get_feed(
     radius: Optional[float] = None,
     following_only: bool = False
 ):
-    query = db.query(models.Post)
+    query = db.query(models.post.Post)
     
     if following_only:
-        following_ids = [f.following_id for f in db.query(models.Follow).filter(models.Follow.follower_id == user_id).all()]
-        query = query.filter(models.Post.owner_id.in_(following_ids))
+        following_ids = [f.following_id for f in db.query(models.follow.Follow).filter(models.follow.Follow.follower_id == user_id).all()]
+        query = query.filter(models.post.Post.owner_id.in_(following_ids))
     
     if category:
-        query = query.filter(models.Post.category == category)
+        query = query.filter(models.post.Post.category == category)
     
     if latitude and longitude and radius:
         # Haversine formula for distance calculation
         query = query.filter(
             func.acos(
-                func.sin(func.radians(latitude)) * func.sin(func.radians(models.Post.latitude)) +
-                func.cos(func.radians(latitude)) * func.cos(func.radians(models.Post.latitude)) *
-                func.cos(func.radians(longitude - models.Post.longitude))
+                func.sin(func.radians(latitude)) * func.sin(func.radians(models.post.Post.latitude)) +
+                func.cos(func.radians(latitude)) * func.cos(func.radians(models.post.Post.latitude)) *
+                func.cos(func.radians(longitude - models.post.Post.longitude))
             ) * 6371 <= radius  # 6371 is Earth's radius in kilometers
         )
     
-    return query.order_by(desc(models.Post.created_at)).offset(skip).limit(limit).all()
+    return query.order_by(desc(models.post.Post.created_at)).offset(skip).limit(limit).all()
 
 # Interaction operations
 def toggle_like(db: Session, post_id: int, user_id: int):
-    existing_like = db.query(models.Like).filter(
-        models.Like.post_id == post_id,
-        models.Like.user_id == user_id
+    existing_like = db.query(models.interaction.Like).filter(
+        models.interaction.Like.post_id == post_id,
+        models.interaction.Like.user_id == user_id
     ).first()
     
     if existing_like:
@@ -112,23 +112,23 @@ def toggle_like(db: Session, post_id: int, user_id: int):
         db.commit()
         return None
     
-    db_like = models.Like(post_id=post_id, user_id=user_id)
+    db_like = models.interaction.Like(post_id=post_id, user_id=user_id)
     db.add(db_like)
     db.commit()
     db.refresh(db_like)
     return db_like
 
 def create_comment(db: Session, post_id: int, user_id: int, comment: schemas.CommentCreate):
-    db_comment = models.Comment(**comment.dict(), post_id=post_id, user_id=user_id)
+    db_comment = models.interaction.Comment(**comment.dict(), post_id=post_id, user_id=user_id)
     db.add(db_comment)
     db.commit()
     db.refresh(db_comment)
     return db_comment
 
 def toggle_got_it(db: Session, post_id: int, user_id: int):
-    existing_got_it = db.query(models.GotIt).filter(
-        models.GotIt.post_id == post_id,
-        models.GotIt.user_id == user_id
+    existing_got_it = db.query(models.interaction.GotIt).filter(
+        models.interaction.GotIt.post_id == post_id,
+        models.interaction.GotIt.user_id == user_id
     ).first()
     
     if existing_got_it:
@@ -136,7 +136,7 @@ def toggle_got_it(db: Session, post_id: int, user_id: int):
         db.commit()
         return None
     
-    db_got_it = models.GotIt(post_id=post_id, user_id=user_id)
+    db_got_it = models.interaction.GotIt(post_id=post_id, user_id=user_id)
     db.add(db_got_it)
     db.commit()
     db.refresh(db_got_it)
@@ -144,9 +144,9 @@ def toggle_got_it(db: Session, post_id: int, user_id: int):
 
 # Follow operations
 def toggle_follow(db: Session, follower_id: int, following_id: int):
-    existing_follow = db.query(models.Follow).filter(
-        models.Follow.follower_id == follower_id,
-        models.Follow.following_id == following_id
+    existing_follow = db.query(models.follow.Follow).filter(
+        models.follow.Follow.follower_id == follower_id,
+        models.follow.Follow.following_id == following_id
     ).first()
     
     if existing_follow:
@@ -154,29 +154,29 @@ def toggle_follow(db: Session, follower_id: int, following_id: int):
         db.commit()
         return None
     
-    db_follow = models.Follow(follower_id=follower_id, following_id=following_id)
+    db_follow = models.follow.Follow(follower_id=follower_id, following_id=following_id)
     db.add(db_follow)
     db.commit()
     db.refresh(db_follow)
     return db_follow
 
 def get_user_followers(db: Session, user_id: int, skip: int = 0, limit: int = 20):
-    return db.query(models.User).join(
-        models.Follow, models.Follow.follower_id == models.User.id
+    return db.query(models.user.User).join(
+        models.follow.Follow, models.follow.Follow.follower_id == models.user.User.id
     ).filter(
-        models.Follow.following_id == user_id
+        models.follow.Follow.following_id == user_id
     ).offset(skip).limit(limit).all()
 
 def get_user_following(db: Session, user_id: int, skip: int = 0, limit: int = 20):
-    return db.query(models.User).join(
-        models.Follow, models.Follow.following_id == models.User.id
+    return db.query(models.user.User).join(
+        models.follow.Follow, models.follow.Follow.following_id == models.user.User.id
     ).filter(
-        models.Follow.follower_id == user_id
+        models.follow.Follow.follower_id == user_id
     ).offset(skip).limit(limit).all()
 
 # Message operations
 def get_message(db: Session, message_id: int):
-    return db.query(models.Message).filter(models.Message.id == message_id).first()
+    return db.query(models.message.Message).filter(models.message.Message.id == message_id).first()
 
 def get_user_messages(
     db: Session,
@@ -186,15 +186,15 @@ def get_user_messages(
     message_type: Optional[MessageType] = None,
     unread_only: bool = False
 ):
-    query = db.query(models.Message).filter(models.Message.receiver_id == user_id)
+    query = db.query(models.message.Message).filter(models.message.Message.receiver_id == user_id)
     
     if message_type:
-        query = query.filter(models.Message.type == message_type)
+        query = query.filter(models.message.Message.type == message_type)
     
     if unread_only:
-        query = query.filter(models.Message.read == False)
+        query = query.filter(models.message.Message.read == False)
     
-    return query.order_by(desc(models.Message.created_at)).offset(skip).limit(limit).all()
+    return query.order_by(desc(models.message.Message.created_at)).offset(skip).limit(limit).all()
 
 def mark_message_read(db: Session, message_id: int):
     message = get_message(db, message_id)
@@ -204,9 +204,9 @@ def mark_message_read(db: Session, message_id: int):
     return message
 
 def mark_all_messages_read(db: Session, user_id: int):
-    messages = db.query(models.Message).filter(
-        models.Message.receiver_id == user_id,
-        models.Message.read == False
+    messages = db.query(models.message.Message).filter(
+        models.message.Message.receiver_id == user_id,
+        models.message.Message.read == False
     ).all()
     
     for message in messages:
@@ -221,17 +221,17 @@ def delete_message(db: Session, message_id: int):
     db.commit()
 
 def get_unread_message_count(db: Session, user_id: int):
-    total = db.query(func.count(models.Message.id)).filter(
-        models.Message.receiver_id == user_id,
-        models.Message.read == False
+    total = db.query(func.count(models.message.Message.id)).filter(
+        models.message.Message.receiver_id == user_id,
+        models.message.Message.read == False
     ).scalar()
     
     by_type = {}
     for message_type in MessageType:
-        count = db.query(func.count(models.Message.id)).filter(
-            models.Message.receiver_id == user_id,
-            models.Message.read == False,
-            models.Message.type == message_type
+        count = db.query(func.count(models.message.Message.id)).filter(
+            models.message.Message.receiver_id == user_id,
+            models.message.Message.read == False,
+            models.message.Message.type == message_type
         ).scalar()
         by_type[message_type.value] = count
     

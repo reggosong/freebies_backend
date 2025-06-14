@@ -20,7 +20,7 @@ class UserRead(UserBase):
     longitude: Optional[float] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserProfile(UserRead):
     stats: dict
