@@ -2,7 +2,7 @@ import requests
 import os
 from datetime import datetime
 
-BASE_URL = "http://localhost:8001"
+BASE_URL = "http://localhost:8000"
 test_user1 = {
     "username": f"testuser1_{datetime.now().strftime('%Y%m%d%H%M%S')}",
     "email": f"test1_{datetime.now().strftime('%Y%m%d%H%M%S')}@example.com",
