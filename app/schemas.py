@@ -18,6 +18,7 @@ class UserRead(UserBase):
     profile_picture_url: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    display_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -38,6 +39,8 @@ class PostBase(BaseModel):
     latitude: float
     longitude: float
     photo_url: str
+    address: Optional[str] = None
+    city: Optional[str] = None
 
 class PostCreate(PostBase):
     pass
@@ -49,6 +52,8 @@ class PostUpdate(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     photo_url: Optional[str] = None
+    address: Optional[str] = None
+    city: Optional[str] = None
 
 class PostRead(PostBase):
     id: int
@@ -59,6 +64,7 @@ class PostRead(PostBase):
     likes_count: int
     comments_count: int
     got_it_count: int
+    city: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -144,17 +150,4 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    username: Optional[str] = None
-
-class PostCreate(BaseModel):
-    title: str
-    content: str
-
-class PostRead(BaseModel):
-    id: int
-    title: str
-    content: str
-    owner_id: int
-    created_at: datetime
-    class Config:
-        orm_mode = True 
+    username: Optional[str] = None 

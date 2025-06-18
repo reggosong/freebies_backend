@@ -48,7 +48,12 @@ def get_user_posts(db: Session, user_id: int, skip: int = 0, limit: int = 20):
     return db.query(models.post.Post).filter(models.post.Post.owner_id == user_id).offset(skip).limit(limit).all()
 
 def create_post(db: Session, post: schemas.PostCreate, user_id: int):
-    db_post = models.post.Post(**post.dict(), owner_id=user_id)
+    post_dict = post.dict()
+    # Convert Enum to string if needed
+    if hasattr(post_dict['category'], 'value'):
+        post_dict['category'] = post_dict['category'].value
+    post_dict.pop('city', None)  # Remove city if present
+    db_post = models.post.Post(**post_dict, owner_id=user_id)
     db.add(db_post)
     db.commit()
     db.refresh(db_post)
@@ -86,7 +91,8 @@ def get_feed(
         query = query.filter(models.post.Post.owner_id.in_(following_ids))
     
     if category:
-        query = query.filter(models.post.Post.category == category)
+        category_value = category.value if hasattr(category, 'value') else category
+        query = query.filter(models.post.Post.category == category_value)
     
     if latitude and longitude and radius:
         # Haversine formula for distance calculation
