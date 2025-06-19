@@ -127,13 +127,19 @@ def delete_post(
     return post
 
 # Like/Unlike post
-@router.post("/{post_id}/like", response_model=schemas.LikeRead)
+@router.post("/{post_id}/like", response_model=schemas.PostRead)
 def like_post(
     post_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: schemas.UserRead = Depends(utils.get_current_user)
 ):
-    return crud.toggle_like(db, post_id, current_user.id)
+    crud.toggle_like(db, post_id, current_user.id)
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    post.photo_url = build_absolute_photo_url(request, post.photo_url)
+    return post
 
 # Comment on post
 @router.post("/{post_id}/comment", response_model=schemas.CommentRead)
@@ -146,13 +152,19 @@ def comment_post(
     return crud.create_comment(db, post_id, current_user.id, comment)
 
 # Mark post as "Got it"
-@router.post("/{post_id}/got-it", response_model=schemas.GotItRead)
+@router.post("/{post_id}/got-it", response_model=schemas.PostRead)
 def got_it_post(
     post_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: schemas.UserRead = Depends(utils.get_current_user)
 ):
-    return crud.toggle_got_it(db, post_id, current_user.id)
+    crud.toggle_got_it(db, post_id, current_user.id)
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    post.photo_url = build_absolute_photo_url(request, post.photo_url)
+    return post
 
 # Get users who liked a post
 @router.get("/{post_id}/likes", response_model=List[schemas.UserRead])
@@ -176,4 +188,16 @@ def get_post_comments(post_id: int, db: Session = Depends(get_db)):
     post = crud.get_post(db, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    return post.comments 
+    return post.comments
+
+# Delete a comment
+@router.delete("/comments/{comment_id}")
+def delete_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    success = crud.delete_comment(db, comment_id, current_user.id)
+    if not success:
+        raise HTTPException(status_code=403, detail="Not authorized or comment not found")
+    return {"detail": "Comment deleted"} 

@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, UniqueConstraint, Enum as SqlEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db import Base
+import enum
 
 class Comment(Base):
     __tablename__ = "comments"
@@ -37,4 +38,24 @@ class GotIt(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     post = relationship("Post", back_populates="got_it")
-    user = relationship("User", back_populates="got_it") 
+    user = relationship("User", back_populates="got_it")
+
+# Notification type enum
+class NotificationType(enum.Enum):
+    LIKE = "like"
+    GOT_IT = "got_it"
+    COMMENT = "comment"
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))  # recipient
+    post_id = Column(Integer, ForeignKey("posts.id"))
+    actor_id = Column(Integer, ForeignKey("users.id"))  # who triggered
+    type = Column(SqlEnum(NotificationType))
+    message = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    post = relationship("Post", back_populates="notifications")
+    actor = relationship("User", foreign_keys=[actor_id]) 

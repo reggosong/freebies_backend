@@ -6,6 +6,7 @@ from datetime import datetime
 import math
 from app.models.post import PostCategory
 from app.models.message import MessageType
+from app.models.interaction import Notification, NotificationType
 
 # User operations
 def get_user(db: Session, user_id: int):
@@ -112,16 +113,18 @@ def toggle_like(db: Session, post_id: int, user_id: int):
         models.interaction.Like.post_id == post_id,
         models.interaction.Like.user_id == user_id
     ).first()
-    
+    post = db.query(models.post.Post).filter(models.post.Post.id == post_id).first()
+    actor = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if existing_like:
         db.delete(existing_like)
         db.commit()
         return None
-    
     db_like = models.interaction.Like(post_id=post_id, user_id=user_id)
     db.add(db_like)
     db.commit()
     db.refresh(db_like)
+    # Notification
+    create_notification(db, post, actor, NotificationType.LIKE, f"{actor.display_name or actor.username} liked your post '{post.title}'")
     return db_like
 
 def create_comment(db: Session, post_id: int, user_id: int, comment: schemas.CommentCreate):
@@ -129,6 +132,10 @@ def create_comment(db: Session, post_id: int, user_id: int, comment: schemas.Com
     db.add(db_comment)
     db.commit()
     db.refresh(db_comment)
+    # Notification
+    post = db.query(models.post.Post).filter(models.post.Post.id == post_id).first()
+    actor = db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    create_notification(db, post, actor, NotificationType.COMMENT, f"{actor.display_name or actor.username} commented on your post '{post.title}'")
     return db_comment
 
 def toggle_got_it(db: Session, post_id: int, user_id: int):
@@ -136,17 +143,29 @@ def toggle_got_it(db: Session, post_id: int, user_id: int):
         models.interaction.GotIt.post_id == post_id,
         models.interaction.GotIt.user_id == user_id
     ).first()
-    
+    post = db.query(models.post.Post).filter(models.post.Post.id == post_id).first()
+    actor = db.query(models.user.User).filter(models.user.User.id == user_id).first()
     if existing_got_it:
         db.delete(existing_got_it)
         db.commit()
         return None
-    
     db_got_it = models.interaction.GotIt(post_id=post_id, user_id=user_id)
     db.add(db_got_it)
     db.commit()
     db.refresh(db_got_it)
+    # Notification
+    create_notification(db, post, actor, NotificationType.GOT_IT, f"{actor.display_name or actor.username} got your item in post '{post.title}'")
     return db_got_it
+
+def delete_comment(db: Session, comment_id: int, user_id: int):
+    comment = db.query(models.interaction.Comment).filter(models.interaction.Comment.id == comment_id).first()
+    if not comment:
+        return False
+    if comment.user_id != user_id:
+        return False
+    db.delete(comment)
+    db.commit()
+    return True
 
 # Follow operations
 def toggle_follow(db: Session, follower_id: int, following_id: int):
@@ -250,4 +269,30 @@ def authenticate_user(db: Session, username: str, password: str):
         return False
     if not utils.verify_password(password, user.hashed_password):
         return False
-    return user 
+    return user
+
+def create_notification(db, post, actor, notif_type, message=None):
+    # Don't notify if actor is the post owner
+    if post.owner_id == actor.id:
+        return None
+    # Only one LIKE or GOT_IT notification per user per post
+    if notif_type in [NotificationType.LIKE, NotificationType.GOT_IT]:
+        existing = db.query(Notification).filter_by(
+            user_id=post.owner_id,
+            post_id=post.id,
+            actor_id=actor.id,
+            type=notif_type
+        ).first()
+        if existing:
+            return None
+    notif = Notification(
+        user_id=post.owner_id,
+        post_id=post.id,
+        actor_id=actor.id,
+        type=notif_type,
+        message=message,
+    )
+    db.add(notif)
+    db.commit()
+    db.refresh(notif)
+    return notif 

@@ -150,4 +150,18 @@ class Token(BaseModel):
     token_type: str
 
 class TokenData(BaseModel):
-    username: Optional[str] = None 
+    username: Optional[str] = None
+
+class NotificationRead(BaseModel):
+    id: int
+    user_id: int
+    post_id: int
+    actor_id: int
+    type: str
+    message: str
+    created_at: datetime
+    post: Optional[PostRead]
+    actor: Optional[UserRead]
+
+    class Config:
+        orm_mode = True 

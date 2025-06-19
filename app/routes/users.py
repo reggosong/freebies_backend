@@ -7,6 +7,8 @@ import shutil
 import os
 from datetime import datetime
 import logging
+from app.models.interaction import Notification
+from app.schemas import NotificationRead
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -234,4 +236,20 @@ def lookup_user_by_username(username: str, db: Session = Depends(get_db), reques
     user_dict = user.__dict__.copy()
     if user_dict.get("profile_picture_url"):
         user_dict["profile_picture_url"] = build_absolute_photo_url(request, user_dict["profile_picture_url"])
-    return user_dict 
+    return user_dict
+
+# Get notifications for current user
+@router.get("/notifications/", response_model=List[NotificationRead])
+def get_notifications(
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user),
+    request: Request = None
+):
+    notifs = db.query(Notification).filter(Notification.user_id == current_user.id).order_by(Notification.created_at.desc()).all()
+    # Eager load post and actor, and patch post.photo_url to absolute
+    for n in notifs:
+        _ = n.post
+        _ = n.actor
+        if n.post and n.post.photo_url:
+            n.post.photo_url = build_absolute_photo_url(request, n.post.photo_url)
+    return notifs 
