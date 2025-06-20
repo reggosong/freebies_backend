@@ -9,6 +9,7 @@ from datetime import datetime
 import logging
 from app.models.interaction import Notification
 from app.schemas import NotificationRead
+from app.models.user import User
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,21 +17,64 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+# Helper to build absolute URL for photo
+def build_absolute_photo_url(request: Request, photo_url: str) -> str:
+    logger.info(f"Building absolute URL for: {photo_url}")
+    if not photo_url:
+        return None
+    if photo_url.startswith('http'):
+        logger.info(f"URL already absolute: {photo_url}")
+        return photo_url
+
+    # Ensure the URL starts with uploads/
+    if not photo_url.startswith('uploads/'):
+        photo_url = f"uploads/{photo_url.lstrip('/')}"
+
+    base_url = str(request.base_url).rstrip('/')
+    # Only replace double slashes after the protocol
+    protocol_parts = base_url.split('://', 1)
+    if len(protocol_parts) > 1:
+        protocol = protocol_parts[0] + '://'
+        path = protocol_parts[1].replace('//', '/')
+        base_url = protocol + path
+    
+    absolute_url = f"{base_url}/{photo_url}"
+    
+    logger.info(f"Built absolute URL: {absolute_url}")
+    logger.info(f"From base_url: {base_url}")
+    logger.info(f"And photo_url: {photo_url}")
+    return absolute_url
+
 # Get current user profile
 @router.get("/me", response_model=schemas.UserProfile)
 def get_current_user_profile(
     request: Request,
-    current_user: schemas.UserRead = Depends(utils.get_current_user)
+    current_user: schemas.UserRead = Depends(utils.get_current_user),
+    db: Session = Depends(get_db)
 ):
     logger.info("="*50)
     logger.info("GET /users/me endpoint called")
     logger.info(f"Request base URL: {request.base_url}")
+    
+    # Get the full user object to access the stats property
+    user = crud.get_user(db, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get the stats explicitly
+    user_stats = user.stats
+    logger.info(f"User stats: {user_stats}")
+    
     user_dict = current_user.dict()
     logger.info(f"Original profile_picture_url: {user_dict.get('profile_picture_url')}")
     if user_dict.get("profile_picture_url"):
         absolute_url = build_absolute_photo_url(request, user_dict["profile_picture_url"])
         logger.info(f"Converted to absolute URL: {absolute_url}")
         user_dict["profile_picture_url"] = absolute_url
+    
+    # Add stats to the response
+    user_dict["stats"] = user_stats
+    
     logger.info("="*50)
     return user_dict
 
@@ -119,6 +163,55 @@ async def update_current_user_profile(
         logger.error(f"Unexpected error in update_current_user_profile: {str(e)}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
+# Add new endpoint for user lookup by username
+@router.get("/lookup", response_model=schemas.UserProfile)
+def lookup_user_by_username(username: str, db: Session = Depends(get_db), request: Request = None):
+    user = crud.get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get the stats explicitly
+    user_stats = user.stats
+    
+    user_dict = user.__dict__.copy()
+    if user_dict.get("profile_picture_url"):
+        user_dict["profile_picture_url"] = build_absolute_photo_url(request, user_dict["profile_picture_url"])
+    
+    # Add stats to the response
+    user_dict["stats"] = user_stats
+    
+    return user_dict
+
+# Add new endpoint for user search
+@router.get("/search", response_model=List[schemas.UserRead])
+def search_users(
+    q: str, 
+    limit: int = 10, 
+    db: Session = Depends(get_db), 
+    request: Request = None
+):
+    """Search users by username or display name (case-insensitive partial match)"""
+    if not q or len(q.strip()) < 2:
+        return []
+    
+    search_term = f"%{q.strip().lower()}%"
+    
+    # Search by username or display name
+    users = db.query(User).filter(
+        (User.username.ilike(search_term)) | 
+        (User.display_name.ilike(search_term))
+    ).limit(limit).all()
+    
+    # Convert to response format with absolute URLs
+    results = []
+    for user in users:
+        user_dict = user.__dict__.copy()
+        if user_dict.get("profile_picture_url"):
+            user_dict["profile_picture_url"] = build_absolute_photo_url(request, user_dict["profile_picture_url"])
+        results.append(user_dict)
+    
+    return results
+
 # Get user profile by ID
 @router.get("/{user_id}", response_model=schemas.UserProfile)
 def get_user_profile(
@@ -128,18 +221,30 @@ def get_user_profile(
 ):
     logger.info("="*50)
     logger.info(f"GET /users/{user_id} endpoint called")
-    logger.info(f"Request base URL: {request.base_url}")
     user = crud.get_user(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user_dict = user.__dict__.copy()
-    logger.info(f"Original profile_picture_url: {user_dict.get('profile_picture_url')}")
-    if user_dict.get("profile_picture_url"):
-        absolute_url = build_absolute_photo_url(request, user_dict["profile_picture_url"])
-        logger.info(f"Converted to absolute URL: {absolute_url}")
-        user_dict["profile_picture_url"] = absolute_url
+
+    # Get the stats explicitly
+    user_stats = user.stats
+    logger.info(f"User stats: {user_stats}")
+
+    # Manually construct the response to match UserProfile schema
+    user_profile = schemas.UserProfile(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        bio=user.bio,
+        profile_picture_url=build_absolute_photo_url(request, user.profile_picture_url),
+        latitude=user.latitude,
+        longitude=user.longitude,
+        display_name=user.display_name,
+        stats=user_stats  # Explicitly include the stats
+    )
+    
+    logger.info(f"Returning user profile for user_id: {user_id}")
     logger.info("="*50)
-    return user_dict
+    return user_profile
 
 # Follow/Unfollow user
 @router.post("/{user_id}/follow", response_model=schemas.FollowRead)
@@ -174,34 +279,6 @@ def get_user_following(
 ):
     return crud.get_user_following(db, user_id, skip=skip, limit=limit)
 
-# Helper to build absolute URL for photo
-def build_absolute_photo_url(request: Request, photo_url: str) -> str:
-    logger.info(f"Building absolute URL for: {photo_url}")
-    if not photo_url:
-        return None
-    if photo_url.startswith('http'):
-        logger.info(f"URL already absolute: {photo_url}")
-        return photo_url
-
-    # Ensure the URL starts with uploads/
-    if not photo_url.startswith('uploads/'):
-        photo_url = f"uploads/{photo_url.lstrip('/')}"
-
-    base_url = str(request.base_url).rstrip('/')
-    # Only replace double slashes after the protocol
-    protocol_parts = base_url.split('://', 1)
-    if len(protocol_parts) > 1:
-        protocol = protocol_parts[0] + '://'
-        path = protocol_parts[1].replace('//', '/')
-        base_url = protocol + path
-    
-    absolute_url = f"{base_url}/{photo_url}"
-    
-    logger.info(f"Built absolute URL: {absolute_url}")
-    logger.info(f"From base_url: {base_url}")
-    logger.info(f"And photo_url: {photo_url}")
-    return absolute_url
-
 # Get user's posts
 @router.get("/{user_id}/posts", response_model=List[schemas.PostRead])
 def get_user_posts(
@@ -226,17 +303,6 @@ def get_user_stats(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user.stats
-
-# Add new endpoint for user lookup by username
-@router.get("/lookup", response_model=schemas.UserProfile)
-def lookup_user_by_username(username: str, db: Session = Depends(get_db), request: Request = None):
-    user = crud.get_user_by_username(db, username)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    user_dict = user.__dict__.copy()
-    if user_dict.get("profile_picture_url"):
-        user_dict["profile_picture_url"] = build_absolute_photo_url(request, user_dict["profile_picture_url"])
-    return user_dict
 
 # Get notifications for current user
 @router.get("/notifications/", response_model=List[NotificationRead])

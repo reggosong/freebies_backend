@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, subqueryload
 from sqlalchemy import func, desc, and_, or_
 from app import models, schemas, utils
 from typing import List, Optional
@@ -10,7 +10,11 @@ from app.models.interaction import Notification, NotificationType
 
 # User operations
 def get_user(db: Session, user_id: int):
-    return db.query(models.user.User).filter(models.user.User.id == user_id).first()
+    return db.query(models.user.User).options(
+        subqueryload(models.user.User.posts).subqueryload(models.post.Post.got_it),
+        joinedload(models.user.User.followers),
+        joinedload(models.user.User.following),
+    ).filter(models.user.User.id == user_id).first()
 
 def get_user_by_username(db: Session, username: str):
     return db.query(models.user.User).filter(models.user.User.username == username).first()

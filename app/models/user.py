@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Float
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, object_session
 from app.db import Base
+from app.models.post import Post
+from app.models.interaction import GotIt
 
 class User(Base):
     __tablename__ = "users"
@@ -35,8 +37,24 @@ class User(Base):
 
     @property
     def stats(self):
+        session = object_session(self)
+        if not session:
+            # If the object is not attached to a session, we can't query.
+            # This might happen in tests or other contexts.
+            return {"posts": 0, "got_it": 0, "gave": 0}
+
+        posts_count = session.query(Post).filter(Post.owner_id == self.id).count()
+        
+        got_it_count = session.query(GotIt).filter(GotIt.user_id == self.id).count()
+        
+        # Efficiently count posts by this user that have at least one 'got_it'
+        gave_count = session.query(Post.id).filter(
+            Post.owner_id == self.id,
+            Post.got_it.any()
+        ).count()
+
         return {
-            "posts": len(self.posts),
-            "got_it": len(self.got_it),
-            "gave": sum(1 for post in self.posts if len(post.got_it) > 0)
+            "posts": posts_count,
+            "got_it": got_it_count,
+            "gave": gave_count
         } 

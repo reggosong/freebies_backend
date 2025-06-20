@@ -3,13 +3,14 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app import schemas, crud, utils
 from app.db import get_db
-from app.models.post import PostCategory
+from app.models.post import PostCategory, Post
 from app.models.interaction import Comment, Like, GotIt
 import shutil
 import os
 from datetime import datetime
 from pydantic import ValidationError
 import logging
+from sqlalchemy.sql import func
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +58,38 @@ async def create_post(
     # Patch photo_url to be absolute
     post.photo_url = build_absolute_photo_url(request, post.photo_url)
     return post
+
+# Add search endpoint for posts
+@router.get("/search", response_model=List[schemas.PostRead])
+def search_posts(
+    q: str,
+    skip: int = 0,
+    limit: int = 20,
+    category: Optional[str] = None,
+    db: Session = Depends(get_db),
+    request: Request = None,
+):
+    """Search posts by title or description (case-insensitive partial match)"""
+    if not q or len(q.strip()) < 2:
+        return []
+    
+    search_term = f"%{q.strip().lower()}%"
+    
+    query = db.query(Post).filter(
+        (Post.title.ilike(search_term)) | 
+        (Post.description.ilike(search_term))
+    )
+    
+    if category:
+        query = query.filter(Post.category == category)
+    
+    posts = query.offset(skip).limit(limit).all()
+    
+    # Convert to response format with absolute URLs
+    for post in posts:
+        post.photo_url = build_absolute_photo_url(request, post.photo_url)
+    
+    return posts
 
 # Get post by ID
 @router.get("/{post_id}", response_model=schemas.PostRead)
