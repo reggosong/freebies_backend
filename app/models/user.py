@@ -57,4 +57,54 @@ class User(Base):
             "posts": posts_count,
             "got_it": got_it_count,
             "gave": gave_count
+        }
+
+    @property
+    def level_info(self):
+        stats = self.stats
+        total_score = stats["posts"] + stats["got_it"] + stats["gave"]
+        
+        # Level thresholds and badges
+        levels = [
+            {"level": 1, "min_score": 0, "badge": "🌱", "title": "Newcomer"},
+            {"level": 2, "min_score": 5, "badge": "🍃", "title": "Helper"},
+            {"level": 3, "min_score": 15, "badge": "🌿", "title": "Contributor"},
+            {"level": 4, "min_score": 30, "badge": "🌳", "title": "Supporter"},
+            {"level": 5, "min_score": 50, "badge": "🌲", "title": "Community Member"},
+            {"level": 6, "min_score": 75, "badge": "🌴", "title": "Active Helper"},
+            {"level": 7, "min_score": 100, "badge": "🌵", "title": "Generous Soul"},
+            {"level": 8, "min_score": 150, "badge": "🎋", "title": "Sharing Champion"},
+            {"level": 9, "min_score": 200, "badge": "🎍", "title": "Community Hero"},
+            {"level": 10, "min_score": 300, "badge": "🏆", "title": "Freebie Legend"}
+        ]
+        
+        # Find current level
+        current_level = levels[0]
+        for level in levels:
+            if total_score >= level["min_score"]:
+                current_level = level
+            else:
+                break
+        
+        # Calculate progress to next level
+        next_level = None
+        for level in levels:
+            if level["level"] > current_level["level"]:
+                next_level = level
+                break
+        
+        progress = 0
+        if next_level:
+            current_level_score = current_level["min_score"]
+            next_level_score = next_level["min_score"]
+            progress = ((total_score - current_level_score) / (next_level_score - current_level_score)) * 100
+        
+        return {
+            "level": current_level["level"],
+            "badge": current_level["badge"],
+            "title": current_level["title"],
+            "total_score": total_score,
+            "progress": min(progress, 100),
+            "next_level": next_level["level"] if next_level else None,
+            "next_title": next_level["title"] if next_level else None
         } 

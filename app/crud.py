@@ -50,7 +50,7 @@ def get_post(db: Session, post_id: int):
     return db.query(models.post.Post).filter(models.post.Post.id == post_id).first()
 
 def get_user_posts(db: Session, user_id: int, skip: int = 0, limit: int = 20):
-    return db.query(models.post.Post).filter(models.post.Post.owner_id == user_id).offset(skip).limit(limit).all()
+    return db.query(models.post.Post).filter(models.post.Post.owner_id == user_id).order_by(desc(models.post.Post.created_at)).offset(skip).limit(limit).all()
 
 def create_post(db: Session, post: schemas.PostCreate, user_id: int):
     post_dict = post.dict()
@@ -128,7 +128,7 @@ def toggle_like(db: Session, post_id: int, user_id: int):
     db.commit()
     db.refresh(db_like)
     # Notification
-    create_notification(db, post, actor, NotificationType.LIKE, f"{actor.display_name or actor.username} liked your post '{post.title}'")
+    create_notification(db, post, actor, NotificationType.LIKE, f"{actor.display_name or actor.username} liked your post")
     return db_like
 
 def create_comment(db: Session, post_id: int, user_id: int, comment: schemas.CommentCreate):
@@ -139,7 +139,7 @@ def create_comment(db: Session, post_id: int, user_id: int, comment: schemas.Com
     # Notification
     post = db.query(models.post.Post).filter(models.post.Post.id == post_id).first()
     actor = db.query(models.user.User).filter(models.user.User.id == user_id).first()
-    create_notification(db, post, actor, NotificationType.COMMENT, f"{actor.display_name or actor.username} commented on your post '{post.title}'")
+    create_notification(db, post, actor, NotificationType.COMMENT, f"{actor.display_name or actor.username} commented on your post")
     return db_comment
 
 def toggle_got_it(db: Session, post_id: int, user_id: int):
@@ -158,7 +158,7 @@ def toggle_got_it(db: Session, post_id: int, user_id: int):
     db.commit()
     db.refresh(db_got_it)
     # Notification
-    create_notification(db, post, actor, NotificationType.GOT_IT, f"{actor.display_name or actor.username} got your item in post '{post.title}'")
+    create_notification(db, post, actor, NotificationType.GOT_IT, f"{actor.display_name or actor.username} got the item from your post")
     return db_got_it
 
 def delete_comment(db: Session, comment_id: int, user_id: int):
@@ -185,6 +185,22 @@ def toggle_follow(db: Session, follower_id: int, following_id: int):
     
     db_follow = models.follow.Follow(follower_id=follower_id, following_id=following_id)
     db.add(db_follow)
+
+    # Create notification for the user being followed
+    try:
+        actor = db.query(models.user.User).filter(models.user.User.id == follower_id).first()
+        if actor:
+            notif = models.interaction.Notification(
+                user_id=following_id,  # The user being followed
+                actor_id=follower_id,  # The user who followed
+                type=models.interaction.NotificationType.FOLLOW,
+                message=f"{actor.display_name or actor.username} started following you."
+            )
+            db.add(notif)
+    except Exception as e:
+        # Log the error, but don't fail the follow action
+        print(f"Error creating follow notification: {e}")
+
     db.commit()
     db.refresh(db_follow)
     return db_follow
@@ -202,6 +218,14 @@ def get_user_following(db: Session, user_id: int, skip: int = 0, limit: int = 20
     ).filter(
         models.follow.Follow.follower_id == user_id
     ).offset(skip).limit(limit).all()
+
+def mark_all_notifications_as_read(db: Session, user_id: int):
+    db.query(models.interaction.Notification).filter(
+        models.interaction.Notification.user_id == user_id,
+        models.interaction.Notification.is_read == False
+    ).update({"is_read": True})
+    db.commit()
+    return {"status": "success"}
 
 # Message operations
 def get_message(db: Session, message_id: int):

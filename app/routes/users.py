@@ -75,6 +75,9 @@ def get_current_user_profile(
     # Add stats to the response
     user_dict["stats"] = user_stats
     
+    # Add level info to the response
+    user_dict["level_info"] = user.level_info
+    
     logger.info("="*50)
     return user_dict
 
@@ -149,6 +152,9 @@ async def update_current_user_profile(
             # Add stats to response
             user_dict["stats"] = updated_user.stats
             
+            # Add level info to the response
+            user_dict["level_info"] = updated_user.level_info
+            
             logger.info(f"Final response data: {user_dict}")
             logger.info("="*50)
             
@@ -179,6 +185,9 @@ def lookup_user_by_username(username: str, db: Session = Depends(get_db), reques
     
     # Add stats to the response
     user_dict["stats"] = user_stats
+    
+    # Add level info to the response
+    user_dict["level_info"] = user.level_info
     
     return user_dict
 
@@ -242,22 +251,33 @@ def get_user_profile(
         stats=user_stats  # Explicitly include the stats
     )
     
+    # Add level info to the response
+    user_profile.level_info = user.level_info
+    
     logger.info(f"Returning user profile for user_id: {user_id}")
     logger.info("="*50)
     return user_profile
 
 # Follow/Unfollow user
-@router.post("/{user_id}/follow", response_model=schemas.FollowRead)
+@router.post("/{user_id}/follow", status_code=status.HTTP_200_OK)
 def follow_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: schemas.UserRead = Depends(utils.get_current_user)
 ):
-    logger.info(f"User {current_user.username} attempting to follow user ID: {user_id}")
+    logger.info(f"User {current_user.username} attempting to follow/unfollow user ID: {user_id}")
     if user_id == current_user.id:
         logger.warning(f"User {current_user.username} attempted to follow themselves")
         raise HTTPException(status_code=400, detail="Cannot follow yourself")
-    return crud.toggle_follow(db, current_user.id, user_id)
+    
+    result = crud.toggle_follow(db, current_user.id, user_id)
+    
+    if result:
+        # Successfully followed
+        return {"status": "followed"}
+    else:
+        # Successfully unfollowed
+        return {"status": "unfollowed"}
 
 # Get user's followers
 @router.get("/{user_id}/followers", response_model=List[schemas.UserRead])
@@ -314,8 +334,46 @@ def get_notifications(
     notifs = db.query(Notification).filter(Notification.user_id == current_user.id).order_by(Notification.created_at.desc()).all()
     # Eager load post and actor, and patch post.photo_url to absolute
     for n in notifs:
-        _ = n.post
+        # Eagerly load related objects to avoid separate queries
         _ = n.actor
-        if n.post and n.post.photo_url:
-            n.post.photo_url = build_absolute_photo_url(request, n.post.photo_url)
-    return notifs 
+        if n.post:
+            _ = n.post
+            if n.post.photo_url:
+                n.post.photo_url = build_absolute_photo_url(request, n.post.photo_url)
+    return notifs
+
+@router.get("/notifications/unread-count", response_model=int)
+def get_unread_notifications_count(
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    """Get the count of unread notifications for the current user."""
+    count = db.query(Notification).filter(
+        Notification.user_id == current_user.id,
+        Notification.is_read == False
+    ).count()
+    return count
+
+@router.put("/notifications/{notification_id}/read", response_model=NotificationRead)
+def mark_notification_as_read(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    notification = db.query(Notification).filter(Notification.id == notification_id).first()
+    if not notification:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    if notification.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You are not authorized to mark this notification as read")
+    notification.is_read = True
+    db.commit()
+    return notification
+
+@router.put("/notifications/read-all", status_code=status.HTTP_204_NO_CONTENT)
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    """Mark all notifications for the current user as read."""
+    crud.mark_all_notifications_as_read(db, current_user.id)
+    return 

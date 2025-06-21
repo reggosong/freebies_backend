@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, UniqueConstraint, Enum as SqlEnum
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, UniqueConstraint, Enum as SqlEnum, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db import Base
@@ -45,17 +45,19 @@ class NotificationType(enum.Enum):
     LIKE = "like"
     GOT_IT = "got_it"
     COMMENT = "comment"
+    FOLLOW = "follow"
 
 class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))  # recipient
-    post_id = Column(Integer, ForeignKey("posts.id"))
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=True)
     actor_id = Column(Integer, ForeignKey("users.id"))  # who triggered
     type = Column(SqlEnum(NotificationType))
     message = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_read = Column(Boolean, default=False)
 
     post = relationship("Post", back_populates="notifications")
     actor = relationship("User", foreign_keys=[actor_id]) 

@@ -12,6 +12,15 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
 
+class LevelInfo(BaseModel):
+    level: int
+    badge: str
+    title: str
+    total_score: int
+    progress: float
+    next_level: Optional[int] = None
+    next_title: Optional[str] = None
+
 class UserRead(UserBase):
     id: int
     bio: Optional[str] = None
@@ -19,12 +28,14 @@ class UserRead(UserBase):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     display_name: Optional[str] = None
+    level_info: Optional[LevelInfo] = None
 
     class Config:
         from_attributes = True
 
 class UserProfile(UserRead):
     stats: dict
+    level_info: Optional[LevelInfo] = None
 
 class UserStats(BaseModel):
     posts: int
@@ -155,7 +166,7 @@ class TokenData(BaseModel):
 class NotificationRead(BaseModel):
     id: int
     user_id: int
-    post_id: int
+    post_id: Optional[int]
     actor_id: int
     type: str
     message: str
