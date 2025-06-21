@@ -6,7 +6,20 @@ from datetime import datetime
 import math
 from app.models.post import PostCategory
 from app.models.message import MessageType
-from app.models.interaction import Notification, NotificationType
+from app.models.interaction import Notification, NotificationType, HiddenPost
+from fastapi import HTTPException
+
+# Haversine distance function
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 6371  # Earth radius in kilometers
+    dLat = math.radians(lat2 - lat1)
+    dLon = math.radians(lon2 - lon1)
+    a = (math.sin(dLat / 2) * math.sin(dLat / 2) +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+         math.sin(dLon / 2) * math.sin(dLon / 2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    distance = R * c
+    return distance
 
 # User operations
 def get_user(db: Session, user_id: int):
@@ -67,6 +80,11 @@ def create_post(db: Session, post: schemas.PostCreate, user_id: int):
 def update_post(db: Session, post_id: int, post: schemas.PostUpdate):
     db_post = get_post(db, post_id)
     update_data = post.dict(exclude_unset=True)
+
+    # Convert category enum to its string value before updating
+    if 'category' in update_data and hasattr(update_data['category'], 'value'):
+        update_data['category'] = update_data['category'].value
+
     for key, value in update_data.items():
         setattr(db_post, key, value)
     db.commit()
@@ -75,6 +93,9 @@ def update_post(db: Session, post_id: int, post: schemas.PostUpdate):
 
 def delete_post(db: Session, post_id: int):
     db_post = get_post(db, post_id)
+    # Manually nullify the post_id in associated GotIt records
+    for got_it_record in db_post.got_it:
+        got_it_record.post_id = None
     db.delete(db_post)
     db.commit()
 
@@ -89,7 +110,17 @@ def get_feed(
     radius: Optional[float] = None,
     following_only: bool = False
 ):
+    # Get all post IDs that the user has hidden
+    hidden_post_ids_query = db.query(models.interaction.HiddenPost.post_id).filter(
+        models.interaction.HiddenPost.user_id == user_id
+    )
+    hidden_post_ids = {row[0] for row in hidden_post_ids_query.all()}
+    
     query = db.query(models.post.Post)
+    
+    # Exclude hidden posts
+    if hidden_post_ids:
+        query = query.filter(models.post.Post.id.notin_(hidden_post_ids))
     
     if following_only:
         following_ids = [f.following_id for f in db.query(models.follow.Follow).filter(models.follow.Follow.follower_id == user_id).all()]
@@ -110,6 +141,21 @@ def get_feed(
         )
     
     return query.order_by(desc(models.post.Post.created_at)).offset(skip).limit(limit).all()
+
+def hide_post(db: Session, user_id: int, post_id: int):
+    existing_hidden = db.query(models.interaction.HiddenPost).filter(
+        models.interaction.HiddenPost.user_id == user_id,
+        models.interaction.HiddenPost.post_id == post_id
+    ).first()
+
+    if existing_hidden:
+        return existing_hidden
+
+    db_hidden_post = models.interaction.HiddenPost(user_id=user_id, post_id=post_id)
+    db.add(db_hidden_post)
+    db.commit()
+    db.refresh(db_hidden_post)
+    return db_hidden_post
 
 # Interaction operations
 def toggle_like(db: Session, post_id: int, user_id: int):
@@ -143,6 +189,12 @@ def create_comment(db: Session, post_id: int, user_id: int, comment: schemas.Com
     return db_comment
 
 def toggle_got_it(db: Session, post_id: int, user_id: int):
+    post = get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.is_gone:
+        raise HTTPException(status_code=400, detail="This item has been reported as gone and can no longer be marked as 'Got It'.")
+
     existing_got_it = db.query(models.interaction.GotIt).filter(
         models.interaction.GotIt.post_id == post_id,
         models.interaction.GotIt.user_id == user_id
@@ -153,7 +205,11 @@ def toggle_got_it(db: Session, post_id: int, user_id: int):
         db.delete(existing_got_it)
         db.commit()
         return None
-    db_got_it = models.interaction.GotIt(post_id=post_id, user_id=user_id)
+    db_got_it = models.interaction.GotIt(
+        post_id=post_id, 
+        user_id=user_id, 
+        giver_id=post.owner_id
+    )
     db.add(db_got_it)
     db.commit()
     db.refresh(db_got_it)

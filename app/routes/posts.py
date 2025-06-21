@@ -131,18 +131,50 @@ def get_feed(
 
 # Update post
 @router.put("/{post_id}", response_model=schemas.PostRead)
-def update_post(
+async def update_post(
     post_id: int,
-    post: schemas.PostUpdate,
     db: Session = Depends(get_db),
-    current_user: schemas.UserRead = Depends(utils.get_current_user)
+    current_user: schemas.UserRead = Depends(utils.get_current_user),
+    title: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    category: Optional[PostCategory] = Form(None),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    address: Optional[str] = Form(None),
+    city: Optional[str] = Form(None),
+    photo: Optional[UploadFile] = File(None)
 ):
     db_post = crud.get_post(db, post_id)
     if not db_post:
         raise HTTPException(status_code=404, detail="Post not found")
     if db_post.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not authorized to update this post")
-    return crud.update_post(db, post_id, post)
+
+    update_data = {
+        "title": title,
+        "description": description,
+        "category": category,
+        "latitude": latitude,
+        "longitude": longitude,
+        "address": address,
+        "city": city,
+    }
+
+    if photo:
+        photo_path = f"uploads/posts/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.filename}"
+        os.makedirs(os.path.dirname(photo_path), exist_ok=True)
+        with open(photo_path, "wb") as buffer:
+            shutil.copyfileobj(photo.file, buffer)
+        update_data["photo_url"] = photo_path
+
+    # Filter out None values so we only update provided fields
+    update_data_filtered = {k: v for k, v in update_data.items() if v is not None}
+    
+    if not update_data_filtered:
+        return db_post # Or raise an exception if no data is provided
+
+    post_update_schema = schemas.PostUpdate(**update_data_filtered)
+    return crud.update_post(db, post_id, post_update_schema)
 
 # Delete a post
 @router.delete("/{post_id}", response_model=schemas.PostRead)
@@ -233,4 +265,54 @@ def delete_comment(
     success = crud.delete_comment(db, comment_id, current_user.id)
     if not success:
         raise HTTPException(status_code=403, detail="Not authorized or comment not found")
-    return {"detail": "Comment deleted"} 
+    return {"detail": "Comment deleted"}
+
+@router.post("/{post_id}/hide", status_code=status.HTTP_200_OK)
+def hide_post_from_feed(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    crud.hide_post(db, user_id=current_user.id, post_id=post_id)
+    return {"message": "Post hidden successfully"}
+
+@router.post("/{post_id}/report-gone", response_model=schemas.PostRead)
+async def report_post_as_gone(
+    post_id: int,
+    latitude: float = Form(...),
+    longitude: float = Form(...),
+    photo: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # Verify user location is close to the post location
+    distance = crud.haversine_distance(latitude, longitude, post.latitude, post.longitude)
+    if distance > 0.1: # 0.1 km = 100 meters
+        raise HTTPException(
+            status_code=403,
+            detail=f"You must be within 100 meters of the item to report it as gone. You are {int(distance * 1000)} meters away."
+        )
+
+    # Save new photo
+    photo_path = f"uploads/posts/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{photo.filename}"
+    os.makedirs(os.path.dirname(photo_path), exist_ok=True)
+    with open(photo_path, "wb") as buffer:
+        shutil.copyfileobj(photo.file, buffer)
+
+    # Update post
+    updated_description = f"Reported all gone by {current_user.username}.\n\n{post.description}"
+    update_data = schemas.PostUpdate(
+        photo_url=photo_path,
+        description=updated_description,
+        is_gone=True
+    )
+    
+    updated_post = crud.update_post(db, post_id, update_data)
+    return updated_post 

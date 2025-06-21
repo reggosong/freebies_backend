@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Float, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, Float, Enum, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -24,11 +24,12 @@ class Post(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_gone = Column(Boolean, default=False)
 
     owner = relationship("User", back_populates="posts")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
     likes = relationship("Like", back_populates="post", cascade="all, delete-orphan")
-    got_it = relationship("GotIt", back_populates="post", cascade="all, delete-orphan")
+    got_it = relationship("GotIt", back_populates="post", cascade="save-update")
     messages = relationship("Message", back_populates="post", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="post", cascade="all, delete-orphan")
 

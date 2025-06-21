@@ -65,6 +65,7 @@ class PostUpdate(BaseModel):
     photo_url: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
+    is_gone: Optional[bool] = None
 
 class PostRead(PostBase):
     id: int
@@ -75,6 +76,7 @@ class PostRead(PostBase):
     likes_count: int
     comments_count: int
     got_it_count: int
+    is_gone: bool
     city: Optional[str] = None
 
     class Config:
@@ -173,6 +175,17 @@ class NotificationRead(BaseModel):
     created_at: datetime
     post: Optional[PostRead]
     actor: Optional[UserRead]
+
+    class Config:
+        orm_mode = True
+
+class HiddenPost(BaseModel):
+    user_id: int
+    post_id: int
+
+class HiddenPostRead(HiddenPost):
+    id: int
+    created_at: datetime
 
     class Config:
         orm_mode = True 

@@ -33,12 +33,23 @@ class GotIt(Base):
     __table_args__ = (UniqueConstraint('post_id', 'user_id', name='unique_got_it'),)
 
     id = Column(Integer, primary_key=True, index=True)
-    post_id = Column(Integer, ForeignKey("posts.id"))
-    user_id = Column(Integer, ForeignKey("users.id"))
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id")) # The user who received it
+    giver_id = Column(Integer, ForeignKey("users.id")) # The user who gave it
     created_at = Column(DateTime, default=datetime.utcnow)
 
     post = relationship("Post", back_populates="got_it")
-    user = relationship("User", back_populates="got_it")
+    user = relationship("User", back_populates="got_it", foreign_keys=[user_id])
+    giver = relationship("User", foreign_keys=[giver_id])
+
+class HiddenPost(Base):
+    __tablename__ = "hidden_posts"
+    __table_args__ = (UniqueConstraint('user_id', 'post_id', name='unique_hidden_post'),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"))
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 # Notification type enum
 class NotificationType(enum.Enum):

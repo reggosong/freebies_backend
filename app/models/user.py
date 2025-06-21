@@ -30,7 +30,7 @@ class User(Base):
     )
     comments = relationship("Comment", back_populates="user")
     likes = relationship("Like", back_populates="user")
-    got_it = relationship("GotIt", back_populates="user")
+    got_it = relationship("GotIt", back_populates="user", foreign_keys="[GotIt.user_id]")
     sent_messages = relationship("Message", foreign_keys="Message.sender_id", back_populates="sender")
     received_messages = relationship("Message", foreign_keys="Message.receiver_id", back_populates="receiver")
     notifications = relationship("Notification", foreign_keys="Notification.user_id", back_populates=None)
@@ -47,11 +47,8 @@ class User(Base):
         
         got_it_count = session.query(GotIt).filter(GotIt.user_id == self.id).count()
         
-        # Efficiently count posts by this user that have at least one 'got_it'
-        gave_count = session.query(Post.id).filter(
-            Post.owner_id == self.id,
-            Post.got_it.any()
-        ).count()
+        # Count "gave" by looking for GotIt records where this user is the giver
+        gave_count = session.query(GotIt).filter(GotIt.giver_id == self.id).count()
 
         return {
             "posts": posts_count,
