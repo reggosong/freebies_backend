@@ -120,4 +120,19 @@ yarn-error.log*
 *.bak
 *.swp
 *~.nib
-local.properties 
+local.properties
+
+# Uploads - User uploaded content
+uploads/
+uploads/*
+uploads/posts/
+uploads/profiles/
+uploads/**/*
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.webp
+*.heic
+*.heif
