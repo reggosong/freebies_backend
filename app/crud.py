@@ -157,6 +157,26 @@ def hide_post(db: Session, user_id: int, post_id: int):
     db.refresh(db_hidden_post)
     return db_hidden_post
 
+def unhide_post(db: Session, user_id: int, post_id: int):
+    hidden_post = db.query(models.interaction.HiddenPost).filter(
+        models.interaction.HiddenPost.user_id == user_id,
+        models.interaction.HiddenPost.post_id == post_id
+    ).first()
+
+    if not hidden_post:
+        return None
+
+    db.delete(hidden_post)
+    db.commit()
+    return {"message": "Post unhidden successfully"}
+
+def is_post_hidden(db: Session, user_id: int, post_id: int) -> bool:
+    hidden_post = db.query(models.interaction.HiddenPost).filter(
+        models.interaction.HiddenPost.user_id == user_id,
+        models.interaction.HiddenPost.post_id == post_id
+    ).first()
+    return hidden_post is not None
+
 # Interaction operations
 def toggle_like(db: Session, post_id: int, user_id: int):
     existing_like = db.query(models.interaction.Like).filter(

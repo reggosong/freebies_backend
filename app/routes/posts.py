@@ -279,6 +279,32 @@ def hide_post_from_feed(
     crud.hide_post(db, user_id=current_user.id, post_id=post_id)
     return {"message": "Post hidden successfully"}
 
+@router.delete("/{post_id}/hide", status_code=status.HTTP_200_OK)
+def unhide_post_from_feed(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    result = crud.unhide_post(db, user_id=current_user.id, post_id=post_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Post was not hidden")
+    return {"message": "Post unhidden successfully"}
+
+@router.get("/{post_id}/hidden-status")
+def get_post_hidden_status(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: schemas.UserRead = Depends(utils.get_current_user)
+):
+    post = crud.get_post(db, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    is_hidden = crud.is_post_hidden(db, user_id=current_user.id, post_id=post_id)
+    return {"is_hidden": is_hidden}
+
 @router.post("/{post_id}/report-gone", response_model=schemas.PostRead)
 async def report_post_as_gone(
     post_id: int,
