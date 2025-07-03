@@ -56,8 +56,8 @@ def get_current_user_profile(
     logger.info("GET /users/me endpoint called")
     logger.info(f"Request base URL: {request.base_url}")
     
-    # Get the full user object to access the stats property
-    user = crud.get_user(db, current_user.id)
+    # Use a simpler approach - get user by username instead of complex relationship loading
+    user = crud.get_user_by_username(db, current_user.username)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
