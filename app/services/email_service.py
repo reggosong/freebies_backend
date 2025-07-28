@@ -3,8 +3,13 @@ from app.config import get_settings
 from pathlib import Path
 import jwt
 from datetime import datetime, timedelta
+import os
 
 settings = get_settings()
+
+# Create email_templates directory if it doesn't exist
+template_folder = Path(__file__).parent / 'email_templates'
+template_folder.mkdir(exist_ok=True)
 
 # Email configuration
 conf = ConnectionConfig(
@@ -16,7 +21,7 @@ conf = ConnectionConfig(
     MAIL_STARTTLS=True,
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True,
-    TEMPLATE_FOLDER=Path(__file__).parent / 'email_templates'
+    TEMPLATE_FOLDER=template_folder
 )
 
 fastmail = FastMail(conf)
@@ -46,7 +51,7 @@ def verify_reset_token(token: str) -> str:
 async def send_password_reset_email(email: str, token: str):
     """Send password reset email"""
     reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-    
+
     message = MessageSchema(
         subject="Password Reset Request",
         recipients=[email],
@@ -67,5 +72,5 @@ async def send_password_reset_email(email: str, token: str):
         """,
         subtype="html"
     )
-    
+
     await fastmail.send_message(message) 
