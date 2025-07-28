@@ -2,35 +2,56 @@
 
 This is the backend API for the Freebies app, a platform for sharing and finding free food.
 
+## Prerequisites
+
+- Python 3.8+
+- PostgreSQL database
+
 ## Setup Instructions
 
-1. Create a virtual environment:
+1. **Install PostgreSQL** (if not already installed):
 
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+   ```bash
+   # macOS
+   brew install postgresql@14
+   brew services start postgresql@14
 
-2. Install dependencies:
+   # Create database
+   createdb freebies_app
+   ```
 
-```bash
-pip install -r requirements.txt
-```
+2. **Create a virtual environment**:
 
-3. Create a `.env` file in the Backend directory with the following content:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-```
-DATABASE_URL=sqlite:///./freebies.db
-SECRET_KEY=your-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-```
+3. **Install dependencies**:
 
-4. Run the application:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+4. **Create a `.env` file** in the Backend directory with the following content:
+
+   ```
+   DATABASE_URL=postgresql://localhost/freebies_app
+   SECRET_KEY=your-secret-key-here
+   ALGORITHM=HS256
+   ACCESS_TOKEN_EXPIRE_MINUTES=30
+   ```
+
+5. **Set up the database**:
+
+   ```bash
+   python setup_db.py
+   ```
+
+6. **Run the application**:
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
 
 The API will be available at `http://localhost:8000`
 
@@ -162,8 +183,25 @@ Error responses include a detail message explaining the error.
 
 - **Language:** Python
 - **Framework:** FastAPI
-- **Database:** SQLite (via SQLAlchemy ORM)
+- **Database:** PostgreSQL (via SQLAlchemy ORM)
 - **Authentication:** JWT (JSON Web Tokens)
 - **File Upload:** FastAPI's built-in file handling
 - **CORS:** FastAPI's CORS middleware
 - **API Documentation:** Swagger UI and ReDoc
+
+## Database Management
+
+### Creating Tables
+
+```bash
+python setup_db.py
+```
+
+### Database Connection
+
+The app connects to PostgreSQL using the `DATABASE_URL` environment variable. For production, use a proper PostgreSQL service like:
+
+- Heroku Postgres
+- AWS RDS
+- Google Cloud SQL
+- DigitalOcean Managed Databases

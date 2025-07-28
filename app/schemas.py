@@ -189,3 +189,16 @@ class HiddenPostRead(HiddenPost):
 
     class Config:
         orm_mode = True 
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class PasswordResetResponse(BaseModel):
+    message: str
+
+class EmailResponse(BaseModel):
+    message: str 

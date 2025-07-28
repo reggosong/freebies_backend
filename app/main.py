@@ -2,20 +2,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import os
-from app.routes import auth, posts, users, messages
-from app.db import engine
-from app.models import user, post, follow, interaction, message
+
+# Import all models to ensure they're registered with SQLAlchemy
+from app.models.user import User
+from app.models.post import Post
+from app.models.follow import Follow
+from app.models.interaction import Like, GotIt, Comment
+from app.models.message import Message
+from app.models.password_reset import PasswordReset
+
+from app.routes import auth, posts, users, messages, password_reset
 
 # Create necessary directories
 os.makedirs("uploads/posts", exist_ok=True)
 os.makedirs("uploads/profiles", exist_ok=True)
-
-# Create database tables
-user.Base.metadata.create_all(bind=engine)
-post.Base.metadata.create_all(bind=engine)
-follow.Base.metadata.create_all(bind=engine)
-interaction.Base.metadata.create_all(bind=engine)
-message.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Freebies API")
 
@@ -36,6 +36,7 @@ app.include_router(auth.router)
 app.include_router(posts.router)
 app.include_router(users.router)
 app.include_router(messages.router)
+app.include_router(password_reset.router)
 
 @app.get("/")
 def read_root():

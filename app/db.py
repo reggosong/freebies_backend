@@ -5,15 +5,8 @@ from .config import get_settings
 
 settings = get_settings()
 
-# Configure database URL for different environments
-if settings.DATABASE_URL.startswith("postgresql"):
-    # Production (Heroku) - PostgreSQL
-    engine = create_engine(settings.DATABASE_URL)
-else:
-    # Development - SQLite
-    engine = create_engine(
-        settings.DATABASE_URL, connect_args={"check_same_thread": False}
-    )
+# Create PostgreSQL engine
+engine = create_engine(settings.DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
