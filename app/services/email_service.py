@@ -61,10 +61,10 @@ async def send_password_reset_email(email: str, token: str):
     """Send password reset email"""
     # Create a deep link for the React Native app using Expo format
     # This will work with Expo Go and development builds
-    reset_url = f"exp://192.168.1.248:8082/--/reset-password?token={token}"
+    reset_url = f"exp://192.168.1.248:8081/--/reset-password?token={token}"
     
     # Alternative format that might work better with Expo Go
-    expo_url = f"exp://192.168.1.248:8082/--/ResetPassword?token={token}"
+    expo_url = f"exp://192.168.1.248:8081/--/ResetPassword?token={token}"
     
     # Fallback URL for testing
     fallback_url = f"freebies://reset-password?token={token}"
