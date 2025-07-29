@@ -61,7 +61,10 @@ async def send_password_reset_email(email: str, token: str):
     """Send password reset email"""
     # Create a deep link for the React Native app using Expo format
     # This will work with Expo Go and development builds
-    reset_url = f"exp://192.168.1.248:8081/--/reset-password?token={token}"
+    reset_url = f"exp://192.168.1.248:8082/--/reset-password?token={token}"
+    
+    # Alternative format that might work better with Expo Go
+    expo_url = f"exp://192.168.1.248:8082/--/ResetPassword?token={token}"
     
     # Fallback URL for testing
     fallback_url = f"freebies://reset-password?token={token}"
@@ -76,15 +79,21 @@ async def send_password_reset_email(email: str, token: str):
                 <p>You have requested to reset your password for the Freebies app.</p>
                 <p>Click the link below to reset your password:</p>
                 <a href="{reset_url}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                    Reset Password
+                    Reset Password (Link 1)
                 </a>
-                <p><strong>If the link above doesn't work, try this alternative link:</strong></p>
-                <a href="{fallback_url}" style="background-color: #2196F3; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">
+                <br><br>
+                <a href="{expo_url}" style="background-color: #FF9800; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                    Reset Password (Link 2)
+                </a>
+                <br><br>
+                <a href="{fallback_url}" style="background-color: #2196F3; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
                     Alternative Reset Link
                 </a>
                 <p style="margin-top: 20px; font-size: 12px; color: #666;">
-                    <strong>Manual URL (copy and paste):</strong><br>
-                    {reset_url}
+                    <strong>Manual URLs (copy and paste):</strong><br>
+                    Link 1: {reset_url}<br>
+                    Link 2: {expo_url}<br>
+                    Fallback: {fallback_url}
                 </p>
                 <p>This link will expire in 1 hour.</p>
                 <p>If you didn't request this password reset, please ignore this email.</p>
@@ -114,6 +123,7 @@ async def send_password_reset_email(email: str, token: str):
         print(f"🔗 PASSWORD RESET LINK (for testing):")
         print(f"Email: {email}")
         print(f"Reset URL: {reset_url}")
+        print(f"Expo URL: {expo_url}")
         print(f"Fallback URL: {fallback_url}")
         print(f"Token: {token}")
         print(f"{'='*80}\n")
