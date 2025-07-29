@@ -59,11 +59,12 @@ def verify_reset_token(token: str) -> str:
 
 async def send_password_reset_email(email: str, token: str):
     """Send password reset email"""
-    # Create a deep link for the React Native app using the app scheme
-    reset_url = f"freebies://reset-password?token={token}"
+    # Create a deep link for the React Native app using Expo format
+    # This will work with Expo Go and development builds
+    reset_url = f"exp://192.168.1.248:8081/--/reset-password?token={token}"
     
-    # Also provide a fallback web URL for testing
-    web_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    # Fallback URL for testing
+    fallback_url = f"freebies://reset-password?token={token}"
 
     message = MessageSchema(
         subject="Password Reset Request",
@@ -77,8 +78,12 @@ async def send_password_reset_email(email: str, token: str):
                 <a href="{reset_url}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
                     Reset Password
                 </a>
-                <p><strong>If the link above doesn't work, copy and paste this URL into your browser:</strong></p>
-                <p style="word-break: break-all; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace;">
+                <p><strong>If the link above doesn't work, try this alternative link:</strong></p>
+                <a href="{fallback_url}" style="background-color: #2196F3; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block; margin-top: 10px;">
+                    Alternative Reset Link
+                </a>
+                <p style="margin-top: 20px; font-size: 12px; color: #666;">
+                    <strong>Manual URL (copy and paste):</strong><br>
                     {reset_url}
                 </p>
                 <p>This link will expire in 1 hour.</p>
@@ -109,6 +114,7 @@ async def send_password_reset_email(email: str, token: str):
         print(f"🔗 PASSWORD RESET LINK (for testing):")
         print(f"Email: {email}")
         print(f"Reset URL: {reset_url}")
+        print(f"Fallback URL: {fallback_url}")
         print(f"Token: {token}")
         print(f"{'='*80}\n")
         
