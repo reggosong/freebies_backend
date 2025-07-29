@@ -59,7 +59,11 @@ def verify_reset_token(token: str) -> str:
 
 async def send_password_reset_email(email: str, token: str):
     """Send password reset email"""
-    reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+    # Create a deep link for the React Native app using the app scheme
+    reset_url = f"freebies://reset-password?token={token}"
+    
+    # Also provide a fallback web URL for testing
+    web_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
 
     message = MessageSchema(
         subject="Password Reset Request",
@@ -73,6 +77,10 @@ async def send_password_reset_email(email: str, token: str):
                 <a href="{reset_url}" style="background-color: #4CAF50; color: white; padding: 14px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">
                     Reset Password
                 </a>
+                <p><strong>If the link above doesn't work, copy and paste this URL into your browser:</strong></p>
+                <p style="word-break: break-all; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace;">
+                    {reset_url}
+                </p>
                 <p>This link will expire in 1 hour.</p>
                 <p>If you didn't request this password reset, please ignore this email.</p>
                 <p>Best regards,<br>The Freebies Team</p>
