@@ -95,4 +95,13 @@ async def send_password_reset_email(email: str, token: str):
         logger.error(f"Failed to send password reset email to {email}: {e}")
         # Log the email details for debugging
         logger.error(f"Email details - To: {email}, Token: {token}, URL: {reset_url}")
+        
+        # TEMPORARY: Log the reset link to console for testing
+        print(f"\n{'='*80}")
+        print(f"🔗 PASSWORD RESET LINK (for testing):")
+        print(f"Email: {email}")
+        print(f"Reset URL: {reset_url}")
+        print(f"Token: {token}")
+        print(f"{'='*80}\n")
+        
         raise e 
