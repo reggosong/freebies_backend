@@ -1,6 +1,9 @@
 # Freebies Backend API
 
 This is the backend API for the Freebies app, a platform for sharing and finding free food.
+Built as a team project with [Matthew Xu](https://github.com/matt854) and Paulina Xu.
+The mobile client (with screenshots) lives in
+[freebies_frontend](https://github.com/reggosong/freebies_frontend).
 
 ## Prerequisites
 
@@ -164,6 +167,10 @@ For endpoints that require file upload (like creating a post with a photo):
 1. Use form-data in Postman
 2. Add the file in the "photo" field
 3. Add other fields as needed
+
+Uploaded photos are written to `uploads/` at runtime and served statically at
+`/uploads`. The directory is runtime data — it is gitignored and not part of
+the repository.
 
 ## Error Handling
 

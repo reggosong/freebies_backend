@@ -136,3 +136,6 @@ uploads/**/*
 *.webp
 *.heic
 *.heif
+
+# Stray local venv
+freebies/
